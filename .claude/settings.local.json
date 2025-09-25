@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(source:*)",
+      "Bash(python -c:*)",
+      "Bash(python hanlp/server/test_server.py --functionality:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

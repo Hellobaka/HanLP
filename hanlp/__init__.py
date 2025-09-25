@@ -4,6 +4,7 @@
 import hanlp.common
 import hanlp.components
 import hanlp.pretrained
+import hanlp.server
 import hanlp.utils
 from hanlp.version import __version__
 
