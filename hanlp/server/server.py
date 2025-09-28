@@ -856,14 +856,14 @@ class HanLPServer:
 
         return cls(host=args.host, port=args.port, admin_token=args.admin_token, db_path=args.db_path)
 
-import debugpy
+# import debugpy
 
 def main():
     """Main entry point.
 
     This function starts the server with debugging enabled on port 5678.
     """
-    debugpy.listen(('0.0.0.0', 5678))
+    # debugpy.listen(('0.0.0.0', 5678))
     server = HanLPServer.from_args()
     server.start()
 
