@@ -23,7 +23,11 @@ import uuid
 
 from hanlp_common.document import Document
 import hanlp
+import threading
+import socket
 
+class HTTPServerV6(HTTPServer):
+  address_family = socket.AF_INET6
 
 class TaskQueue:
     """Manages concurrent processing with queue and timeout"
@@ -798,6 +802,9 @@ class HanLPServer:
         self.db_path = db_path
         self.server = None
 
+    def run_ipv6_server(self):
+        self.serverv6.serve_forever()
+
     def start(self):
         """Start the server.
 
@@ -819,7 +826,11 @@ class HanLPServer:
             # Add admin token to database if it doesn't exist
             HanLPHandler.token_db.add_token(self.admin_token, 0, is_admin=True)
 
-        self.server = HTTPServer((self.host, self.port), HanLPHandler)
+        if ':' in self.host:
+            self.serverv6 = HTTPServerV6((self.host, self.port), HanLPHandler)
+            print(f"Starting HanLP RESTful API IPV6 server on [{self.host}]:{self.port}")
+            self.host = '0.0.0.0'
+        self.server = HTTPServer((self.host, self.port), HanLPHandler) 
         print(f"Starting HanLP RESTful API server on {self.host}:{self.port}")
         print(f"Database: {self.db_path}")
         if self.admin_token:
@@ -827,10 +838,16 @@ class HanLPServer:
         print("Press Ctrl+C to stop the server")
 
         try:
+            if self.serverv6 is not None:
+               threading.Thread(target=self.run_ipv6_server, daemon=True).start()
+
             self.server.serve_forever()
+
         except KeyboardInterrupt:
             print("\nShutting down server...")
             self.server.shutdown()
+            # if self.serverv6 is not None:
+            #     self.serverv6.shutdown()
 
     @classmethod
     def from_args(cls):

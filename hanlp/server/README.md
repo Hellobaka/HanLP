@@ -26,6 +26,9 @@ python -m hanlp.server
 # Start with custom host and port
 python -m hanlp.server --host 0.0.0.0 --port 8080
 
+# Start with any ipv6 and ipv4 listening
+python -m hanlp.server --host :: --port 8080
+
 # Start with admin token
 python -m hanlp.server --admin-token my-admin-token
 
