@@ -47,6 +47,7 @@ Tokenize text with HanLP.
 ```json
 {
   "text": "Your text here",
+  "can_duplicate": "True",        // Optional
   "tasks": ["tok", "pos"],        // Optional
   "skip_tasks": ["ner"],          // Optional
   "language": "zh",               // Optional

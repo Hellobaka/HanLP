@@ -18,6 +18,7 @@ import time
 import queue
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
+from .stopwords import DEFAULT_STOPWORDS
 import uuid
 
 from hanlp_common.document import Document
@@ -133,9 +134,6 @@ class HanLPHandler(BaseHTTPRequestHandler):
     input validation, and concurrent processing using a task queue.
     """
 
-    # Default Chinese stopwords
-    DEFAULT_STOPWORDS = ['的', '了', '在', '是', '我', '有', '和', '就', '人', '都', '一', '一个', '上', '也', '很', '到', '说', '要', '去', '你', '会', '着', '没有', '看', '好', '自己', '这']
-
     # Shared task queue for concurrent request processing
     task_queue = TaskQueue(max_workers=5, timeout=180)  # 3 minutes timeout
 
@@ -204,16 +202,14 @@ class HanLPHandler(BaseHTTPRequestHandler):
             ValueError: If stopword is not a string, list, or None
         """
         # Apply stopword filtering if provided
+        stopword_list = DEFAULT_STOPWORDS
         if stopword is not None:
             if isinstance(stopword, str):
-                stopword_list = [stopword]
+                stopword_list += [stopword]
             elif isinstance(stopword, list):
-                stopword_list = stopword
+                stopword_list += stopword
             else:
                 raise ValueError('stopword must be a string or array of strings')
-        else:
-            # Use default stopwords
-            stopword_list = self.DEFAULT_STOPWORDS
         return stopword_list
 
     def _parse_request_data(self):
@@ -340,6 +336,7 @@ class HanLPHandler(BaseHTTPRequestHandler):
         # Extract parameters
         text = request_data.get('text')
         tasks = request_data.get('tasks')
+        can_duplicate = request_data.get('can_duplicate')
         skip_tasks = request_data.get('skip_tasks')
         language = request_data.get('language')
         stopword = request_data.get('stopword')  # Optional parameter for custom stopwords
@@ -357,6 +354,7 @@ class HanLPHandler(BaseHTTPRequestHandler):
             self._process_text_with_stats,
             text=text,
             tasks=tasks,
+            can_duplicate=can_duplicate, 
             skip_tasks=skip_tasks,
             language=language,
             token=token,
@@ -527,7 +525,7 @@ class HanLPHandler(BaseHTTPRequestHandler):
             'stats': formatted_stats
         })
 
-    def _process_text(self, text, tasks=None, skip_tasks=None, language=None, stopword=None):
+    def _process_text(self, text, can_duplicate = True, tasks=None, skip_tasks=None, language=None, stopword=None):
         """Process text with HanLP model.
 
         This method applies the HanLP model to perform NLP tasks on the input text.
@@ -550,7 +548,7 @@ class HanLPHandler(BaseHTTPRequestHandler):
             stopword_list = self._process_stopwords(stopword)
 
             # Get tokens
-            tokens = self.model(text, tasks=["tok"], skip_tasks=None, language=language)
+            tokens = self.model(text, tasks=["tok"], skip_tasks=skip_tasks, language=language)
             if isinstance(tokens, dict):
                 tok_tokens = tokens.get("tok", [])
             else:
@@ -562,9 +560,9 @@ class HanLPHandler(BaseHTTPRequestHandler):
             # Create result with filtered tokens
             result = {}
             if tasks and "tok" in tasks:
-                result["tok"] = filtered_tokens
+                result["tok"] = filtered_tokens if can_duplicate else list(dict.fromkeys(filtered_tokens))
             elif not tasks:  # If no tasks specified, return default tokenization
-                result["tok"] = filtered_tokens
+                result["tok"] = filtered_tokens if can_duplicate else list(dict.fromkeys(filtered_tokens))
 
             # Process other tasks if specified
             if tasks and "pos" in tasks:
@@ -583,7 +581,7 @@ class HanLPHandler(BaseHTTPRequestHandler):
         except Exception as e:
             raise Exception(f"Processing failed: {str(e)}")
 
-    def _process_text_with_stats(self, text, tasks=None, skip_tasks=None, language=None, token=None, stopword=None):
+    def _process_text_with_stats(self, text, can_duplicate = True, tasks=None, skip_tasks=None, language=None, token=None, stopword=None):
         """Process text with HanLP model and update usage statistics.
 
         This is a wrapper around _process_text that also updates usage statistics
@@ -604,7 +602,7 @@ class HanLPHandler(BaseHTTPRequestHandler):
             Exception: If processing fails
         """
         try:
-            result = self._process_text(text, tasks=tasks, skip_tasks=skip_tasks, language=language, stopword=stopword)
+            result = self._process_text(text, can_duplicate=can_duplicate, tasks=tasks, skip_tasks=skip_tasks, language=language, stopword=stopword)
 
             # Update usage statistics if token is provided
             if token and self.token_db:
